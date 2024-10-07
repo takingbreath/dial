@@ -10,12 +10,13 @@ const RepaymentPlanDial = () => {
   const [audioBuffer, setAudioBuffer] = useState(null);
   const [supportsVibration, setSupportsVibration] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [showVisualFeedback, setShowVisualFeedback] = useState(false);
 
   const dialRef = useRef(null);
   const lastTickRef = useRef(0);
 
   useEffect(() => {
-    setSupportsVibration('vibrate' in navigator);
+    setSupportsVibration('vibrate' in navigator && !/(iPad|iPhone|iPod)/g.test(navigator.userAgent));
   }, []);
 
   const initializeAudio = async () => {
@@ -43,6 +44,9 @@ const RepaymentPlanDial = () => {
 
     if (supportsVibration) {
       navigator.vibrate(3);
+    } else {
+      setShowVisualFeedback(true);
+      setTimeout(() => setShowVisualFeedback(false), 50);
     }
   };
 
@@ -69,17 +73,15 @@ const RepaymentPlanDial = () => {
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
     let newRotation = getAngle(clientX, clientY) - startAngle;
-    if (newRotation < 0) newRotation += 2 * Math.PI;
+    
+    // Ensure the rotation is always positive and within [0, 2π]
+    newRotation = (newRotation + 2 * Math.PI) % (2 * Math.PI);
 
     const rotationDiff = newRotation - rotation;
-    setTotalRotation(prev => {
-      if (rotationDiff > Math.PI) return prev - (2 * Math.PI - rotationDiff);
-      if (rotationDiff < -Math.PI) return prev + (2 * Math.PI + rotationDiff);
-      return prev + rotationDiff;
-    });
+    setTotalRotation(prev => prev + rotationDiff);
 
     setRotation(newRotation);
-    updatePlan(newRotation, Math.floor(totalRotation / (2 * Math.PI)));
+    updatePlan(newRotation, Math.floor(Math.abs(totalRotation) / (2 * Math.PI)));
 
     const currentTick = Math.floor(newRotation / (Math.PI / 12));
     if (currentTick !== lastTickRef.current) {
@@ -123,7 +125,7 @@ const RepaymentPlanDial = () => {
         document.removeEventListener("touchend", handleEnd);
       };
     }
-  }, [isInitialized, isDragging, startAngle, rotation, totalRotation]);
+  }, [isInitialized, isDragging, startAngle, rotation]);
 
   return (
     <div className="flex flex-col items-center justify-center h-screen bg-gray-100">
@@ -148,7 +150,6 @@ const RepaymentPlanDial = () => {
                 className="absolute inset-0 rounded-full transition-all duration-50 ease-out"
                 style={{
                   background: `conic-gradient(purple ${(rotation / (2 * Math.PI)) * 100}%, transparent 0)`,
-                  transform: `rotate(${-rotation * (180 / Math.PI)}deg)`,
                 }}
               />
               <div className="absolute inset-2 rounded-full bg-white flex items-center justify-center">
@@ -163,6 +164,9 @@ const RepaymentPlanDial = () => {
                   />
                 ))}
               </div>
+              {showVisualFeedback && (
+                <div className="absolute inset-0 bg-white bg-opacity-30 rounded-full transition-opacity duration-50"></div>
+              )}
             </div>
           </div>
           <div className="mt-8 text-xl font-semibold text-gray-700">
