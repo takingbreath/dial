@@ -1,130 +1,17 @@
 import React, { useState, useRef, useEffect } from "react";
 
 const RepaymentPlanDial = () => {
-  const [rotation, setRotation] = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
-  const [startAngle, setStartAngle] = useState(0);
-  const [totalRotation, setTotalRotation] = useState(0);
-  const [plan, setPlan] = useState({ frequency: "Day", duration: 2 });
-  const [showTick, setShowTick] = useState(false);
-  const [audioContext, setAudioContext] = useState(null);
-  const [audioBuffer, setAudioBuffer] = useState(null);
-  const [supportsVibration, setSupportsVibration] = useState(false);
-  const [isInitialized, setIsInitialized] = useState(false);
-  
-  const dialRef = useRef(null);
-  const lastTickRef = useRef(0);
+  // ... (keep all existing state variables and functions)
+
+  const [showArrows, setShowArrows] = useState(true);
 
   useEffect(() => {
-    setSupportsVibration('vibrate' in navigator);
-  }, []);
-
-  const initializeAudio = async () => {
-    const context = new (window.AudioContext || window.webkitAudioContext)();
-    setAudioContext(context);
-
-    try {
-      const response = await fetch("https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3");
-      const arrayBuffer = await response.arrayBuffer();
-      const decodedAudio = await context.decodeAudioData(arrayBuffer);
-      setAudioBuffer(decodedAudio);
-      setIsInitialized(true);
-    } catch (error) {
-      console.error("Error loading audio:", error);
+    if (rotation > Math.PI / 6) { // Hide arrows after 30 degrees of rotation
+      setShowArrows(false);
     }
-  };
+  }, [rotation]);
 
-  const playFeedback = () => {
-    if (audioContext && audioBuffer) {
-      const source = audioContext.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(audioContext.destination);
-      source.start();
-    }
-
-    if (supportsVibration) {
-      navigator.vibrate(10);
-    }
-  };
-
-  const getAngle = (clientX, clientY) => {
-    const rect = dialRef.current.getBoundingClientRect();
-    const x = clientX - rect.left - rect.width / 2;
-    const y = clientY - rect.top - rect.height / 2;
-    return Math.atan2(y, x);
-  };
-
-  const handleStart = (e) => {
-    if (!isInitialized) return;
-    
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    setIsDragging(true);
-    setStartAngle(getAngle(clientX, clientY) - rotation);
-  };
-
-  const handleMove = (e) => {
-    if (!isDragging || !isInitialized) return;
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    let newRotation = getAngle(clientX, clientY) - startAngle;
-    if (newRotation < 0) newRotation += 2 * Math.PI;
-
-    const rotationDiff = newRotation - rotation;
-    setTotalRotation(prev => {
-      if (rotationDiff > Math.PI) return prev - (2 * Math.PI - rotationDiff);
-      if (rotationDiff < -Math.PI) return prev + (2 * Math.PI + rotationDiff);
-      return prev + rotationDiff;
-    });
-
-    setRotation(newRotation);
-    updatePlan(newRotation, Math.floor(totalRotation / (2 * Math.PI)));
-
-    const currentTick = Math.floor(newRotation / (Math.PI / 12));
-    if (currentTick !== lastTickRef.current) {
-      playFeedback();
-      setShowTick(true);
-      setTimeout(() => setShowTick(false), 100);
-      lastTickRef.current = currentTick;
-    }
-  };
-
-  const handleEnd = () => {
-    setIsDragging(false);
-  };
-
-  const updatePlan = (angle, fullRotations) => {
-    const normalizedAngle = angle / (2 * Math.PI);
-    let frequency, duration;
-
-    if (fullRotations % 3 === 0) {
-      frequency = "Day";
-      duration = Math.floor(normalizedAngle * 29) + 2;
-    } else if (fullRotations % 3 === 1) {
-      frequency = "Week";
-      duration = Math.floor(normalizedAngle * 11) + 2;
-    } else {
-      frequency = "Month";
-      duration = Math.floor(normalizedAngle * 11) + 2;
-    }
-
-    setPlan({ frequency, duration });
-  };
-
-  useEffect(() => {
-    if (isInitialized) {
-      document.addEventListener("mousemove", handleMove);
-      document.addEventListener("mouseup", handleEnd);
-      document.addEventListener("touchmove", handleMove);
-      document.addEventListener("touchend", handleEnd);
-      return () => {
-        document.removeEventListener("mousemove", handleMove);
-        document.removeEventListener("mouseup", handleEnd);
-        document.removeEventListener("touchmove", handleMove);
-        document.removeEventListener("touchend", handleEnd);
-      };
-    }
-  }, [isInitialized, isDragging, startAngle, rotation, totalRotation]);
+  // ... (keep other useEffect hooks and functions)
 
   return (
     <div className="flex flex-col items-center justify-center h-screen bg-gray-100">
@@ -138,10 +25,10 @@ const RepaymentPlanDial = () => {
       ) : (
         <>
           <div className="text-2xl font-bold mb-4 text-gray-700">Spin</div>
-          <div className="relative">
+          <div className="relative w-64 h-64">
             <div
               ref={dialRef}
-              className="relative w-64 h-64 rounded-full bg-white shadow-lg cursor-pointer"
+              className="absolute inset-0 rounded-full bg-white shadow-lg cursor-pointer"
               onMouseDown={handleStart}
               onTouchStart={handleStart}
             >
@@ -151,11 +38,11 @@ const RepaymentPlanDial = () => {
                   background: `conic-gradient(purple ${(rotation / (2 * Math.PI)) * 100}%, transparent 0)`,
                 }}
               />
-              <div className="absolute inset-4 rounded-full bg-white flex items-center justify-center">
+              <div className="absolute inset-2 rounded-full bg-white flex items-center justify-center">
                 {[...Array(24)].map((_, i) => (
                   <div
                     key={i}
-                    className="absolute w-0.5 h-3 bg-gray-300"
+                    className="absolute w-0.5 h-3 bg-gray-200"
                     style={{
                       transform: `rotate(${i * 15}deg) translateY(-30px)`,
                       transformOrigin: "bottom center",
@@ -163,10 +50,20 @@ const RepaymentPlanDial = () => {
                   />
                 ))}
               </div>
-              <div className="absolute inset-0 pointer-events-none">
-                <div className="arrow-left"></div>
-                <div className="arrow-right"></div>
-              </div>
+              {showArrows && (
+                <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100">
+                  <path
+                    d="M50,10 A40,40 0 0,1 90,50 L85,50 A35,35 0 0,0 50,15 Z"
+                    fill="#ff69b4"
+                    opacity="0.7"
+                  />
+                  <path
+                    d="M10,50 A40,40 0 0,1 50,10 L50,15 A35,35 0 0,0 15,50 Z"
+                    fill="#ff69b4"
+                    opacity="0.7"
+                  />
+                </svg>
+              )}
               {showTick && (
                 <div className="absolute inset-0 bg-white bg-opacity-50 rounded-full transition-opacity duration-100"></div>
               )}
@@ -180,33 +77,6 @@ const RepaymentPlanDial = () => {
           </button>
         </>
       )}
-      <style jsx>{`
-        .arrow-left, .arrow-right {
-          position: absolute;
-          width: 40px;
-          height: 40px;
-          border: 4px solid #ff69b4;
-          border-top: none;
-          border-right: none;
-          opacity: 0.7;
-          animation: arrow-pulse 2s infinite;
-        }
-        .arrow-left {
-          top: 50%;
-          left: 20px;
-          transform: translateY(-50%) rotate(45deg);
-        }
-        .arrow-right {
-          top: 20px;
-          right: 50%;
-          transform: translateX(50%) rotate(225deg);
-        }
-        @keyframes arrow-pulse {
-          0% { opacity: 0.7; }
-          50% { opacity: 0.3; }
-          100% { opacity: 0.7; }
-        }
-      `}</style>
     </div>
   );
 };
