@@ -11,7 +11,6 @@ const RepaymentPlanDial = () => {
   const [audioBuffer, setAudioBuffer] = useState(null);
   const [supportsVibration, setSupportsVibration] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
-  const [showArrows, setShowArrows] = useState(true);
 
   const dialRef = useRef(null);
   const lastTickRef = useRef(0);
@@ -19,12 +18,6 @@ const RepaymentPlanDial = () => {
   useEffect(() => {
     setSupportsVibration('vibrate' in navigator);
   }, []);
-
-  useEffect(() => {
-    if (rotation > Math.PI / 6) { // Hide arrows after 30 degrees of rotation
-      setShowArrows(false);
-    }
-  }, [rotation]);
 
   const initializeAudio = async () => {
     const context = new (window.AudioContext || window.webkitAudioContext)();
@@ -50,7 +43,7 @@ const RepaymentPlanDial = () => {
     }
 
     if (supportsVibration) {
-      navigator.vibrate(10);
+      navigator.vibrate(3); // Reduced from 10ms to 3ms (70% reduction)
     }
   };
 
@@ -170,20 +163,6 @@ const RepaymentPlanDial = () => {
                   />
                 ))}
               </div>
-              {showArrows && (
-                <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100">
-                  <path
-                    d="M50,10 A40,40 0 0,1 90,50 L85,50 A35,35 0 0,0 50,15 Z"
-                    fill="#ff69b4"
-                    opacity="0.7"
-                  />
-                  <path
-                    d="M10,50 A40,40 0 0,1 50,10 L50,15 A35,35 0 0,0 15,50 Z"
-                    fill="#ff69b4"
-                    opacity="0.7"
-                  />
-                </svg>
-              )}
               {showTick && (
                 <div className="absolute inset-0 bg-white bg-opacity-50 rounded-full transition-opacity duration-100"></div>
               )}
