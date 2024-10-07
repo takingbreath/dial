@@ -11,30 +11,16 @@ const RepaymentPlanDial = () => {
   const [supportsVibration, setSupportsVibration] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [showVisualFeedback, setShowVisualFeedback] = useState(false);
+  const [isMaxed, setIsMaxed] = useState(false);
 
   const dialRef = useRef(null);
   const lastTickRef = useRef(0);
 
-  useEffect(() => {
-    setSupportsVibration('vibrate' in navigator && !/(iPad|iPhone|iPod)/g.test(navigator.userAgent));
-  }, []);
-
-  const initializeAudio = async () => {
-    const context = new (window.AudioContext || window.webkitAudioContext)();
-    setAudioContext(context);
-
-    try {
-      const response = await fetch("https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3");
-      const arrayBuffer = await response.arrayBuffer();
-      const decodedAudio = await context.decodeAudioData(arrayBuffer);
-      setAudioBuffer(decodedAudio);
-      setIsInitialized(true);
-    } catch (error) {
-      console.error("Error loading audio:", error);
-    }
-  };
+  // ... (keep other useEffect hooks and initializeAudio function)
 
   const playFeedback = () => {
+    if (isMaxed) return; // Don't play feedback if maxed out
+
     if (audioContext && audioBuffer) {
       const source = audioContext.createBufferSource();
       source.buffer = audioBuffer;
@@ -79,9 +65,9 @@ const RepaymentPlanDial = () => {
 
     // Check for full rotation
     if (newRotation < Math.PI / 2 && rotation > (3 * Math.PI) / 2) {
-      setFullRotations(prev => prev + 1);
+      setFullRotations(prev => Math.min(prev + 1, 2)); // Cap at 2 full rotations (12 months)
     } else if (newRotation > (3 * Math.PI) / 2 && rotation < Math.PI / 2) {
-      setFullRotations(prev => prev - 1);
+      setFullRotations(prev => Math.max(prev - 1, 0)); // Don't go below 0
     }
 
     setRotation(newRotation);
@@ -102,34 +88,29 @@ const RepaymentPlanDial = () => {
     const normalizedAngle = angle / (2 * Math.PI);
     let frequency, duration;
 
-    if (rotations % 3 === 0) {
-      frequency = "Day";
-      duration = Math.floor(normalizedAngle * 29) + 2; // 2 to 30 days
-    } else if (rotations % 3 === 1) {
-      frequency = "Week";
-      duration = Math.floor(normalizedAngle * 11) + 2; // 2 to 12 weeks
-    } else {
+    if (rotations === 2 && normalizedAngle >= 11/12) {
+      // Max out at 12 months
       frequency = "Month";
-      duration = Math.floor(normalizedAngle * 11) + 2; // 2 to 12 months
+      duration = 12;
+      setIsMaxed(true);
+    } else {
+      setIsMaxed(false);
+      if (rotations === 0) {
+        frequency = "Day";
+        duration = Math.floor(normalizedAngle * 29) + 2; // 2 to 30 days
+      } else if (rotations === 1) {
+        frequency = "Week";
+        duration = Math.floor(normalizedAngle * 11) + 2; // 2 to 12 weeks
+      } else {
+        frequency = "Month";
+        duration = Math.floor(normalizedAngle * 11) + 2; // 2 to 12 months
+      }
     }
 
     setPlan({ frequency, duration });
   };
 
-  useEffect(() => {
-    if (isInitialized) {
-      document.addEventListener("mousemove", handleMove);
-      document.addEventListener("mouseup", handleEnd);
-      document.addEventListener("touchmove", handleMove);
-      document.addEventListener("touchend", handleEnd);
-      return () => {
-        document.removeEventListener("mousemove", handleMove);
-        document.removeEventListener("mouseup", handleEnd);
-        document.removeEventListener("touchmove", handleMove);
-        document.removeEventListener("touchend", handleEnd);
-      };
-    }
-  }, [isInitialized, isDragging, startAngle, rotation, fullRotations]);
+  // ... (keep useEffect for event listeners)
 
   return (
     <div className="flex flex-col items-center justify-center h-screen bg-gray-100">
