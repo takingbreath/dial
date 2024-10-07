@@ -1,20 +1,25 @@
 import React, { useState, useRef, useEffect } from "react";
 
 const RepaymentPlanDial = () => {
-  // ... (keep other state variables)
+  const [rotation, setRotation] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const [startAngle, setStartAngle] = useState(0);
+  const [totalRotation, setTotalRotation] = useState(0);
+  const [plan, setPlan] = useState({ frequency: "Day", duration: 2 });
+  const [showTick, setShowTick] = useState(false);
+  
+  const dialRef = useRef(null);
+  const lastTickRef = useRef(0);
   const [audioContext, setAudioContext] = useState(null);
   const [audioBuffer, setAudioBuffer] = useState(null);
   const [supportsVibration, setSupportsVibration] = useState(false);
 
   useEffect(() => {
-    // Check for vibration support
     setSupportsVibration('vibrate' in navigator);
 
-    // Create AudioContext
     const context = new (window.AudioContext || window.webkitAudioContext)();
     setAudioContext(context);
 
-    // Load audio file
     fetch("https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3")
       .then(response => response.arrayBuffer())
       .then(arrayBuffer => context.decodeAudioData(arrayBuffer))
@@ -26,8 +31,14 @@ const RepaymentPlanDial = () => {
     };
   }, []);
 
+  const getAngle = (clientX, clientY) => {
+    const rect = dialRef.current.getBoundingClientRect();
+    const x = clientX - rect.left - rect.width / 2;
+    const y = clientY - rect.top - rect.height / 2;
+    return Math.atan2(y, x);
+  };
+
   const playFeedback = () => {
-    // Play sound
     if (audioContext && audioBuffer) {
       const source = audioContext.createBufferSource();
       source.buffer = audioBuffer;
@@ -35,14 +46,12 @@ const RepaymentPlanDial = () => {
       source.start();
     }
 
-    // Vibrate
     if (supportsVibration) {
-      navigator.vibrate(50); // Vibrate for 50ms
+      navigator.vibrate(50);
     }
   };
 
   const handleStart = (e) => {
-    // Resume audio context on user interaction
     if (audioContext && audioContext.state === 'suspended') {
       audioContext.resume();
     }
@@ -60,7 +69,15 @@ const RepaymentPlanDial = () => {
     let newRotation = getAngle(clientX, clientY) - startAngle;
     if (newRotation < 0) newRotation += 2 * Math.PI;
 
-    // ... (keep existing rotation logic)
+    const rotationDiff = newRotation - rotation;
+    setTotalRotation(prev => {
+      if (rotationDiff > Math.PI) return prev - (2 * Math.PI - rotationDiff);
+      if (rotationDiff < -Math.PI) return prev + (2 * Math.PI + rotationDiff);
+      return prev + rotationDiff;
+    });
+
+    setRotation(newRotation);
+    updatePlan(newRotation, Math.floor(totalRotation / (2 * Math.PI)));
 
     const currentTick = Math.floor(newRotation / (Math.PI / 12));
     if (currentTick !== lastTickRef.current) {
@@ -71,7 +88,40 @@ const RepaymentPlanDial = () => {
     }
   };
 
-  // ... (keep other functions)
+  const handleEnd = () => {
+    setIsDragging(false);
+  };
+
+  const updatePlan = (angle, fullRotations) => {
+    const normalizedAngle = angle / (2 * Math.PI);
+    let frequency, duration;
+
+    if (fullRotations % 3 === 0) {
+      frequency = "Day";
+      duration = Math.floor(normalizedAngle * 29) + 2;
+    } else if (fullRotations % 3 === 1) {
+      frequency = "Week";
+      duration = Math.floor(normalizedAngle * 11) + 2;
+    } else {
+      frequency = "Month";
+      duration = Math.floor(normalizedAngle * 11) + 2;
+    }
+
+    setPlan({ frequency, duration });
+  };
+
+  useEffect(() => {
+    document.addEventListener("mousemove", handleMove);
+    document.addEventListener("mouseup", handleEnd);
+    document.addEventListener("touchmove", handleMove);
+    document.addEventListener("touchend", handleEnd);
+    return () => {
+      document.removeEventListener("mousemove", handleMove);
+      document.removeEventListener("mouseup", handleEnd);
+      document.removeEventListener("touchmove", handleMove);
+      document.removeEventListener("touchend", handleEnd);
+    };
+  }, [isDragging, startAngle, rotation, totalRotation]);
 
   return (
     <div className="flex flex-col items-center justify-center h-screen bg-gray-100">
@@ -81,9 +131,25 @@ const RepaymentPlanDial = () => {
         onMouseDown={handleStart}
         onTouchStart={handleStart}
       >
-        {/* ... (keep existing JSX) */}
+        <div
+          className="absolute inset-0 rounded-full"
+          style={{
+            background: `conic-gradient(purple ${(rotation / (2 * Math.PI)) * 100}%, transparent 0)`,
+          }}
+        />
+        <div className="absolute inset-4 rounded-full bg-white flex items-center justify-center">
+          {/* Add tick marks here if needed */}
+        </div>
+        {showTick && (
+          <div className="absolute inset-0 bg-white bg-opacity-50 rounded-full transition-opacity duration-100"></div>
+        )}
       </div>
-      {/* ... (keep existing JSX) */}
+      <div className="mt-8 text-xl font-semibold text-gray-700">
+        Every {plan.frequency} for {plan.duration} {plan.frequency}s
+      </div>
+      <button className="mt-4 px-6 py-2 bg-purple-700 text-white rounded-full shadow-md hover:bg-purple-800 transition-colors">
+        Next
+      </button>
     </div>
   );
 };
