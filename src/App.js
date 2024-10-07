@@ -6,7 +6,6 @@ const RepaymentPlanDial = () => {
   const [startAngle, setStartAngle] = useState(0);
   const [totalRotation, setTotalRotation] = useState(0);
   const [plan, setPlan] = useState({ frequency: "Day", duration: 2 });
-  const [showTick, setShowTick] = useState(false);
   const [audioContext, setAudioContext] = useState(null);
   const [audioBuffer, setAudioBuffer] = useState(null);
   const [supportsVibration, setSupportsVibration] = useState(false);
@@ -43,15 +42,17 @@ const RepaymentPlanDial = () => {
     }
 
     if (supportsVibration) {
-      navigator.vibrate(3); // Reduced from 10ms to 3ms (70% reduction)
+      navigator.vibrate(3);
     }
   };
 
   const getAngle = (clientX, clientY) => {
     const rect = dialRef.current.getBoundingClientRect();
-    const x = clientX - rect.left - rect.width / 2;
-    const y = clientY - rect.top - rect.height / 2;
-    return Math.atan2(y, x);
+    const center = {
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2
+    };
+    return Math.atan2(clientY - center.y, clientX - center.x);
   };
 
   const handleStart = (e) => {
@@ -83,8 +84,6 @@ const RepaymentPlanDial = () => {
     const currentTick = Math.floor(newRotation / (Math.PI / 12));
     if (currentTick !== lastTickRef.current) {
       playFeedback();
-      setShowTick(true);
-      setTimeout(() => setShowTick(false), 100);
       lastTickRef.current = currentTick;
     }
   };
@@ -146,9 +145,10 @@ const RepaymentPlanDial = () => {
               onTouchStart={handleStart}
             >
               <div
-                className="absolute inset-0 rounded-full"
+                className="absolute inset-0 rounded-full transition-all duration-50 ease-out"
                 style={{
                   background: `conic-gradient(purple ${(rotation / (2 * Math.PI)) * 100}%, transparent 0)`,
+                  transform: `rotate(${-rotation * (180 / Math.PI)}deg)`,
                 }}
               />
               <div className="absolute inset-2 rounded-full bg-white flex items-center justify-center">
@@ -163,9 +163,6 @@ const RepaymentPlanDial = () => {
                   />
                 ))}
               </div>
-              {showTick && (
-                <div className="absolute inset-0 bg-white bg-opacity-50 rounded-full transition-opacity duration-100"></div>
-              )}
             </div>
           </div>
           <div className="mt-8 text-xl font-semibold text-gray-700">
