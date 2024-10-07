@@ -13,23 +13,26 @@ const RepaymentPlanDial = () => {
   const [audioContext, setAudioContext] = useState(null);
   const [audioBuffer, setAudioBuffer] = useState(null);
   const [supportsVibration, setSupportsVibration] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
     setSupportsVibration('vibrate' in navigator);
+  }, []);
 
+  const initializeAudio = async () => {
     const context = new (window.AudioContext || window.webkitAudioContext)();
     setAudioContext(context);
 
-    fetch("https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3")
-      .then(response => response.arrayBuffer())
-      .then(arrayBuffer => context.decodeAudioData(arrayBuffer))
-      .then(decodedAudio => setAudioBuffer(decodedAudio))
-      .catch(error => console.error("Error loading audio:", error));
-
-    return () => {
-      context.close();
-    };
-  }, []);
+    try {
+      const response = await fetch("https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3");
+      const arrayBuffer = await response.arrayBuffer();
+      const decodedAudio = await context.decodeAudioData(arrayBuffer);
+      setAudioBuffer(decodedAudio);
+      setIsInitialized(true);
+    } catch (error) {
+      console.error("Error loading audio:", error);
+    }
+  };
 
   const getAngle = (clientX, clientY) => {
     const rect = dialRef.current.getBoundingClientRect();
@@ -52,9 +55,7 @@ const RepaymentPlanDial = () => {
   };
 
   const handleStart = (e) => {
-    if (audioContext && audioContext.state === 'suspended') {
-      audioContext.resume();
-    }
+    if (!isInitialized) return;
     
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
@@ -63,7 +64,7 @@ const RepaymentPlanDial = () => {
   };
 
   const handleMove = (e) => {
-    if (!isDragging) return;
+    if (!isDragging || !isInitialized) return;
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
     let newRotation = getAngle(clientX, clientY) - startAngle;
@@ -111,45 +112,58 @@ const RepaymentPlanDial = () => {
   };
 
   useEffect(() => {
-    document.addEventListener("mousemove", handleMove);
-    document.addEventListener("mouseup", handleEnd);
-    document.addEventListener("touchmove", handleMove);
-    document.addEventListener("touchend", handleEnd);
-    return () => {
-      document.removeEventListener("mousemove", handleMove);
-      document.removeEventListener("mouseup", handleEnd);
-      document.removeEventListener("touchmove", handleMove);
-      document.removeEventListener("touchend", handleEnd);
-    };
-  }, [isDragging, startAngle, rotation, totalRotation]);
+    if (isInitialized) {
+      document.addEventListener("mousemove", handleMove);
+      document.addEventListener("mouseup", handleEnd);
+      document.addEventListener("touchmove", handleMove);
+      document.addEventListener("touchend", handleEnd);
+      return () => {
+        document.removeEventListener("mousemove", handleMove);
+        document.removeEventListener("mouseup", handleEnd);
+        document.removeEventListener("touchmove", handleMove);
+        document.removeEventListener("touchend", handleEnd);
+      };
+    }
+  }, [isInitialized, isDragging, startAngle, rotation, totalRotation]);
 
   return (
     <div className="flex flex-col items-center justify-center h-screen bg-gray-100">
-      <div
-        ref={dialRef}
-        className="relative w-64 h-64 rounded-full bg-white shadow-lg cursor-pointer"
-        onMouseDown={handleStart}
-        onTouchStart={handleStart}
-      >
-        <div
-          className="absolute inset-0 rounded-full"
-          style={{
-            background: `conic-gradient(purple ${(rotation / (2 * Math.PI)) * 100}%, transparent 0)`,
-          }}
-        />
-        <div className="absolute inset-4 rounded-full bg-white flex items-center justify-center">
-          {/* Add tick marks here if needed */}
-        </div>
-        {showTick && (
-          <div className="absolute inset-0 bg-white bg-opacity-50 rounded-full transition-opacity duration-100"></div>
-        )}
-      </div>
-      <div className="mt-8 text-xl font-semibold text-gray-700">
-        Every {plan.frequency} for {plan.duration} {plan.frequency}s
-      </div>
-      <button className="mt-4 px-6 py-2 bg-purple-700 text-white rounded-full shadow-md hover:bg-purple-800 transition-colors">
-        Next
-      </button>
+      {!isInitialized ? (
+        <button
+          onClick={initializeAudio}
+          className="px-6 py-2 bg-blue-500 text-white rounded-full shadow-md hover:bg-blue-600 transition-colors"
+        >
+          Start
+        </button>
+      ) : (
+        <>
+          <div
+            ref={dialRef}
+            className="relative w-64 h-64 rounded-full bg-white shadow-lg cursor-pointer"
+            onMouseDown={handleStart}
+            onTouchStart={handleStart}
+          >
+            <div
+              className="absolute inset-0 rounded-full"
+              style={{
+                background: `conic-gradient(purple ${(rotation / (2 * Math.PI)) * 100}%, transparent 0)`,
+              }}
+            />
+            <div className="absolute inset-4 rounded-full bg-white flex items-center justify-center">
+              {/* Add tick marks here if needed */}
+            </div>
+            {showTick && (
+              <div className="absolute inset-0 bg-white bg-opacity-50 rounded-full transition-opacity duration-100"></div>
+            )}
+          </div>
+          <div className="mt-8 text-xl font-semibold text-gray-700">
+            Every {plan.frequency} for {plan.duration} {plan.frequency}s
+          </div>
+          <button className="mt-4 px-6 py-2 bg-purple-700 text-white rounded-full shadow-md hover:bg-purple-800 transition-colors">
+            Next
+          </button>
+        </>
+      )}
     </div>
   );
 };
