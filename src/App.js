@@ -15,7 +15,40 @@ const RepaymentPlanDial = () => {
   const dialRef = useRef(null);
   const lastTickRef = useRef(0);
 
-  // ... (keep other useEffect hooks and functions like initializeAudio, playFeedback, etc.)
+  useEffect(() => {
+    setSupportsVibration('vibrate' in navigator && !/(iPad|iPhone|iPod)/g.test(navigator.userAgent));
+  }, []);
+
+  const initializeAudio = async () => {
+    const context = new (window.AudioContext || window.webkitAudioContext)();
+    setAudioContext(context);
+
+    try {
+      const response = await fetch("https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3");
+      const arrayBuffer = await response.arrayBuffer();
+      const decodedAudio = await context.decodeAudioData(arrayBuffer);
+      setAudioBuffer(decodedAudio);
+      setIsInitialized(true);
+    } catch (error) {
+      console.error("Error loading audio:", error);
+    }
+  };
+
+  const playFeedback = () => {
+    if (audioContext && audioBuffer) {
+      const source = audioContext.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(audioContext.destination);
+      source.start();
+    }
+
+    if (supportsVibration) {
+      navigator.vibrate(3);
+    } else {
+      setShowVisualFeedback(true);
+      setTimeout(() => setShowVisualFeedback(false), 50);
+    }
+  };
 
   const getAngle = (clientX, clientY) => {
     const rect = dialRef.current.getBoundingClientRect();
@@ -61,6 +94,10 @@ const RepaymentPlanDial = () => {
     }
   };
 
+  const handleEnd = () => {
+    setIsDragging(false);
+  };
+
   const updatePlan = (angle, rotations) => {
     const normalizedAngle = angle / (2 * Math.PI);
     let frequency, duration;
@@ -79,7 +116,20 @@ const RepaymentPlanDial = () => {
     setPlan({ frequency, duration });
   };
 
-  // ... (keep other functions and useEffect hooks)
+  useEffect(() => {
+    if (isInitialized) {
+      document.addEventListener("mousemove", handleMove);
+      document.addEventListener("mouseup", handleEnd);
+      document.addEventListener("touchmove", handleMove);
+      document.addEventListener("touchend", handleEnd);
+      return () => {
+        document.removeEventListener("mousemove", handleMove);
+        document.removeEventListener("mouseup", handleEnd);
+        document.removeEventListener("touchmove", handleMove);
+        document.removeEventListener("touchend", handleEnd);
+      };
+    }
+  }, [isInitialized, isDragging, startAngle, rotation, fullRotations]);
 
   return (
     <div className="flex flex-col items-center justify-center h-screen bg-gray-100">
